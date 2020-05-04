@@ -25,3 +25,26 @@ def parse_token(response):
     '''parse csrf token form gitee'''
     result = re.search('<meta content="(.*?)" name="csrf-token"', response.text)
     return result.group(1)
+
+
+def valib_github_repo_url(repo):
+    '''return repo url'''
+    # protocols = ('git', 'https')
+    github_base_url = 'https://github.com/'
+    if repo.startswith(github_base_url):
+        return repo
+    return github_base_url + repo
+
+
+def parse_repo_name(repo):
+    '''parse repo name'''
+    return repo.split('/')[-1:][0]
+
+
+def to_gitee_repo_url(username, repo_name):
+    '''
+    :params username: gitee username
+    :params repo_name:  import repo name
+    return gitee repo url
+    '''
+    return 'https://gitee.com/{}/{}'.format(username, repo_name)
