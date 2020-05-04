@@ -29,6 +29,7 @@ def cmd():
             gitee.token,
             gitee.sess,
             gitee.headers)
+        project.check_project_duplicate()
         project.import_from_github()
         print(args.clone)
         if args.clone:

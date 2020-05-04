@@ -1,11 +1,12 @@
 '''
 import to gitee, clone to local, rename config url
 '''
-import os
+import re
 import sys
 import time
+import os
 
-from git2gitee.config import params, gitee_base_url
+from git2gitee.config import params, gitee_base_url, project_url
 from git2gitee.util import (
     parse_token, valib_github_repo_url, parse_repo_name, to_gitee_repo_url)
 
@@ -28,12 +29,36 @@ class Project:
         self.repo = repo
         self.sess = sess
 
-    def get_project_import_token(self):
+    def _get_project_import_token(self):
         '''get token from project import page'''
         url_project_import = gitee_base_url + 'projects/import/url'
         resp_get_project_import = self.sess.get(url_project_import, headers=self.headers)
-        token = parse_token(resp_get_project_import)
-        return token
+        self.token = parse_token(resp_get_project_import)
+
+    def _set_new_headers(self):
+        '''get project import token, set new headers'''
+        self._get_project_import_token()
+        new_headers = self.headers.copy()
+        new_headers['X-CSRF-Token'] = self.token
+        del new_headers['Upgrade-Insecure-Requests']
+        del new_headers['DNT']
+        self.headers = new_headers
+
+    def check_project_duplicate(self):
+        '''
+        检查是否重复, 是否有人已经导入过了.
+        如果有人导入过了，设置repo为另人的repo, 并退出程序
+        '''
+        self._set_new_headers()
+        data = {'import_url': valib_github_repo_url(self.repo)}
+        response = self.sess.get(project_url, params=data, headers=self.headers)
+        datas = response.json()
+        if datas['is_duplicate']:
+            self.repo = re.search('<a.*?>(.*?)</a>', datas['message']).group(1)
+            print('有人导入了: ', self.repo)
+            reimport = input('是否导入到你的仓库y/n?')
+            if reimport.lower() == 'n':
+                os._exit(0)
 
     def import_from_github(self):
         '''fetch github url to gitee'''
@@ -42,11 +67,7 @@ class Project:
         print(payload)
         print('开始导入', url)
         import_url = gitee_base_url + self.username + '/projects'
-        new_headers = self.headers.copy()
-        new_headers['X-CSRF-Token'] = self.get_project_import_token()
-        del new_headers['Upgrade-Insecure-Requests']
-        del new_headers['DNT']
-        resp = self.sess.post(import_url, data=payload, headers=new_headers)
+        resp = self.sess.post(import_url, data=payload, headers=self.headers)
         if resp.status_code == 200:
             timeout = 180
             while not self.check_fetch():
