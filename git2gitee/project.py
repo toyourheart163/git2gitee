@@ -6,7 +6,9 @@ import sys
 import time
 import os
 
-from git2gitee.config import params, gitee_base_url, project_url
+from git2gitee.config import (
+    params, gitee_base_url, url_check_project_duplicate,
+    url_check_project_private)
 from git2gitee.util import (
     parse_token, valib_github_repo_url, parse_repo_name, to_gitee_repo_url)
 
@@ -22,9 +24,9 @@ class Project:
     project = Project('toyourheart163/git2gitee', 'mikele', gitee.token, gitee.sess)
     project.import_from_github()
     '''
-    def __init__(self, repo, username, token, sess, headers):
+    def __init__(self, repo, username, sess, headers):
         self.username = username
-        self.token = token
+        self.token = None
         self.headers = headers
         self.repo = repo
         self.sess = sess
@@ -44,14 +46,27 @@ class Project:
         del new_headers['DNT']
         self.headers = new_headers
 
-    def check_project_duplicate(self):
+    def check_private(self):
+        '''
+        检查自己仓库里是否有了些repo
+        如果有就退出
+        '''
+        data = {'import_url': valib_github_repo_url(self.repo)}
+        response = self.sess.get(url_check_project_private, params=data, headers=self.headers)
+        print('check private', data)
+        datas = response.json()
+        if datas.get('private'):
+            print(datas.get('message'))
+            os._exit(0)
+
+    def check_duplicate(self):
         '''
         检查是否重复, 是否有人已经导入过了.
         如果有人导入过了，设置repo为另人的repo, 并退出程序
         '''
-        self._set_new_headers()
         data = {'import_url': valib_github_repo_url(self.repo)}
-        response = self.sess.get(project_url, params=data, headers=self.headers)
+        response = self.sess.get(url_check_project_duplicate, params=data, headers=self.headers)
+        print('check duplicate', data)
         datas = response.json()
         if datas['is_duplicate']:
             self.repo = re.search('<a.*?>(.*?)</a>', datas['message']).group(1)
@@ -70,10 +85,14 @@ class Project:
         resp = self.sess.post(import_url, data=payload, headers=self.headers)
         if resp.status_code == 200:
             timeout = 180
-            while not self.check_fetch():
+            success = False
+            while not success:
                 sys.stdout.write('\r正在导入, 请先等待>>> {}秒'.format(timeout))
                 timeout -= 10
                 time.sleep(10)
+                if self.check_fetch():
+                    print('导入成功')
+                    success = True
 
     def check_fetch(self):
         '''
@@ -82,8 +101,10 @@ class Project:
         repo_name = parse_repo_name(self.repo)
         gitee_repo_url = to_gitee_repo_url(self.username, repo_name)
         gitee_url_check = gitee_repo_url + '/check_fetch'
-        response = self.sess.get(gitee_url_check)
-        if response['in_fetch'] == 'false':
+        # print(gitee_repo_url, gitee_url_check, repo_name)
+        response = self.sess.get(gitee_url_check, headers=self.headers)
+        data = response.json()
+        if data['in_fetch'] == 'false':
             return False
         return True
 
@@ -117,3 +138,12 @@ class Project:
         url = valib_github_repo_url(self.repo) + '/force_sync_project'
         response = self.sess.post(url, data=payload, headers=self.headers)
         return response.json()['status']
+
+    def check_private_duplicate(self):
+        '''
+        1. 先查询自己仓库里是否已有些repo；
+        2. 查询有人导过吗？
+        '''
+        self._set_new_headers()
+        self.check_private()
+        self.check_duplicate()

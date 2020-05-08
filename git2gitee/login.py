@@ -55,5 +55,6 @@ class GiteeLogin:
         response = self.sess.post(gitee_base_url + 'login', data=payload, headers=self.headers)
         if self.username in response.text:
             # login success
+            print('login success')
             return True
         return None

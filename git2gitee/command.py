@@ -4,7 +4,12 @@ command line to to gitee clone
 
 from argparse import ArgumentParser
 
-from git2gitee import GiteeLogin, Project
+from git2gitee import GiteeLogin, Project, __version__
+
+
+def version():
+    '''return version'''
+    return __version__
 
 
 def cmd():
@@ -18,20 +23,19 @@ def cmd():
     ap.add_argument('-k', '--password', action='store', help='gitee password')
     ap.add_argument('-c', '--clone', action='store_true', default=False)
     ap.add_argument('--user-agent', action='store_true', default=None)
+    ap.add_argument('-v', '--version', action='version', version=__version__)
     args = ap.parse_args()
 
     gitee = GiteeLogin(args.username, args.password, args.user_agent)
     if gitee.login():
-        print('登陆成功')
         project = Project(
             args.repo,
             args.username,
-            gitee.token,
             gitee.sess,
             gitee.headers)
-        project.check_project_duplicate()
+        project.check_private_duplicate()
         project.import_from_github()
-        print(args.clone)
+        print('是否需要克隆到本地', args.clone)
         if args.clone:
             project.clone()
             project.rename_config_repo_url()

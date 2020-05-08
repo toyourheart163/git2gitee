@@ -17,8 +17,8 @@ headers = {
 
 gitee_base_url = 'https://gitee.com/'
 project_url = gitee_base_url + 'projects/'
-check_project_private = project_url + 'check_project_private'
-check_project_duplicate = project_url + 'check_project_duplicate'
+url_check_project_private = project_url + 'check_project_private'
+url_check_project_duplicate = project_url + 'check_project_duplicate'
 
 duplicate_response = {'is_duplicate': 'false'}
 private_response = {"check_success": "true"}
